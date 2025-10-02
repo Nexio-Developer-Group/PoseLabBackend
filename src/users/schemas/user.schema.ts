@@ -1,8 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import { HydratedDocument } from 'mongoose';
 
-export type UserDocument = User & Document;
+export type UserDocument = HydratedDocument<User>;
 
 @Schema({ timestamps: true }) // Automatically adds createdAt & updatedAt
 export class User {
@@ -16,7 +17,7 @@ export class User {
   email: string;
 
   @Prop({ required: true })
-  password: string; // Store hashed passwords in production
+  password!: string; // non-null assertion
 
   @Prop({ default: false })
   isVerified: boolean; // Email verification flag
@@ -46,4 +47,18 @@ UserSchema.pre<UserDocument>('save', async function (next) {
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
+});
+
+UserSchema.set('toObject', {
+  transform: (_, ret: Record<string, any>) => {
+    delete ret.password;
+    return ret;
+  },
+});
+
+UserSchema.set('toJSON', {
+  transform: (_, ret: Record<string, any>) => {
+    delete ret.password;
+    return ret;
+  },
 });

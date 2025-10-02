@@ -3,44 +3,76 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-    constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) { }
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-    // Create new user
-    async create(createUserDto: CreateUserDto): Promise<UserDocument> {
-        const { email, username, name, password } = createUserDto;
+  // Create new user
+  async create(createUserDto: CreateUserDto): Promise<UserDocument> {
+    const { email, username, name, password } = createUserDto;
 
-        // Check if email or username already exists
-        const existing = await this.userModel.findOne({ $or: [{ email }, { username }] });
-        if (existing) {
-            throw new ConflictException('Email or username already exists');
-        }
-
-        // Create and save user (password will be hashed automatically by pre-save hook)
-        const user = new this.userModel({ email, username, name, password });
-        return user.save();
+    if (!email || !username || !name || !password) {
+      throw new ConflictException('Missing required fields');
     }
 
-    // Get all users
-    async findAll(): Promise<UserDocument[]> {
-        return this.userModel.find({ isDeleted: false }).select('-password').exec();
+    // check if password is strong enough
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      throw new ConflictException('Password is not strong enough');
     }
 
-    // update user
-    async update(id: string, updateUserDto: Partial<User>): Promise<UserDocument | null> {
-        return this.userModel.findByIdAndUpdate(id, updateUserDto, { new: true }).exec();
+    // Check if email is valid
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new ConflictException('Invalid email');
     }
 
-    // Find user by email
-    async findByEmail(email: string): Promise<User | null> {
-        return this.userModel.findOne({ email }).exec();
+    // Check if email or username already exists
+    const existing = await this.userModel.findOne({
+      $or: [{ email }, { username }],
+    });
+    if (existing) {
+      throw new ConflictException('Email or username already exists');
     }
 
-    // Find user by username
-    async findByUsername(username: string): Promise<User | null> {
-        return this.userModel.findOne({ username }).exec();
-    }
+    // Create and save user (password will be hashed automatically by pre-save hook)
+    const user = new this.userModel({ email, username, name, password });
+    return user.save();
+  }
+
+  // update user (only name, profilePicture, bio)
+  async update(
+    id: string,
+    updateUserDto: Partial<Pick<User, 'name' | 'profilePicture' | 'bio'>>,
+  ): Promise<UserDocument | null> {
+    // Pick only allowed fields
+    const allowedUpdates: Partial<User> = {};
+    if (updateUserDto.name) allowedUpdates.name = updateUserDto.name;
+    if (updateUserDto.profilePicture)
+      allowedUpdates.profilePicture = updateUserDto.profilePicture;
+    if (updateUserDto.bio) allowedUpdates.bio = updateUserDto.bio;
+
+    return this.userModel
+      .findByIdAndUpdate(id, allowedUpdates, { new: true })
+      .exec();
+  }
+
+  // Find user by name or username return all similars will be suggesvie search
+  async findByNameOrUsername(query: string): Promise<UserDocument[]> {
+    if (!query) return []; // return empty if no input
+
+    // Matches any part of name or username (case-insensitive)
+    const regex = new RegExp(query, 'i');
+
+    return this.userModel
+      .find({
+        isDeleted: false,
+        $or: [{ name: regex }, { username: regex }],
+      })
+      .select('name username profilePicture') // return only fields needed for suggestion
+      .limit(10) // optional: limit number of suggestions
+      .exec();
+  }
 }
