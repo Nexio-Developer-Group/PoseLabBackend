@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const firebaseAuth = require("../services/firebaseAuth");
 const User = require("../models/user");
 
+
 const LOGIN_TYPE = {
   GOOGLE: 1,
   GITHUB: 2,
@@ -66,9 +67,10 @@ exports.auth = async (req, res) => {
     );
 
     res.json({
+      status: 1,
       success: true,
-      token,
-      user
+      Token: token,
+      User: user
     });
 
   } catch (err) {
