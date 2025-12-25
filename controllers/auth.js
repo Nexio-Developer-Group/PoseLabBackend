@@ -47,7 +47,10 @@ exports.auth = async (req, res) => {
      /* ---------- USER UPSERT ---------- */
     let user = await User.findByUID(decoded.uid);
  
-    if (!user) {
+    if(!user && login_type_id === LOGIN_TYPE.EMAIL){
+      return res.status(404).json({ error: "User not found" });
+    }
+    else if (!user && login_type_id !== LOGIN_TYPE.EMAIL) {
       user = await User.createUser({
         uid: decoded.uid,
         email: decoded.email || null,
