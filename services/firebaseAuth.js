@@ -11,3 +11,14 @@ exports.getOrCreateEmailUser = async (email, password) => {
     return await admin.auth().createUser({ email, password });
   }
 };
+
+// sign up from username email and password
+exports.signUpUser = async (username, email, password) => {
+  try {
+    const user = await admin.auth().createUser({ email, password });
+    await admin.auth().setCustomUserClaims(user.uid, { username });
+    return user;
+  } catch (error) {
+    throw new Error("Failed to create user");
+  }
+};

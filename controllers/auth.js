@@ -80,3 +80,24 @@ exports.auth = async (req, res) => {
     res.status(401).json({ error: "Authentication failed", details: err.message });
   }
 };
+
+// user sign up for email and password
+exports.signUp = async (req, res) => {
+  const { username, email, password } = req.body;
+  try {
+    const firebaseUser = await firebaseAuth.signUpUser(username, email, password);
+    const user = await User.createUser({
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      provider: "password",
+      createdAt: new Date()
+    });
+    res.json({
+      status: 1,
+      success: true,
+      User: user
+    });
+  } catch (err) {
+    res.status(400).json({ error: "Sign up failed", details: err.message });
+  }
+};
