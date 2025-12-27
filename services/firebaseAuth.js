@@ -19,6 +19,7 @@ exports.signUpUser = async (username, email, password) => {
     await admin.auth().setCustomUserClaims(user.uid, { username });
     return user;
   } catch (error) {
-    throw new Error("Failed to create user");
+    throw new Error(error.message);
   }
 };
+

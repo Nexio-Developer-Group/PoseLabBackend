@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const firebaseAuth = require("../services/firebaseAuth");
 const User = require("../models/user");
+const { admin } = require("../firebase");
 
 
 const LOGIN_TYPE = {
@@ -20,24 +21,14 @@ exports.auth = async (req, res) => {
     if (
       login_type_id === LOGIN_TYPE.GOOGLE ||
       login_type_id === LOGIN_TYPE.GITHUB ||
-      login_type_id === LOGIN_TYPE.PHONE
+      login_type_id === LOGIN_TYPE.PHONE  ||
+      login_type_id === LOGIN_TYPE.EMAIL
     ) {
+       
       decoded = await firebaseAuth.verifyFirebaseToken(payload.id_token);
-    } 
-    else if (login_type_id === LOGIN_TYPE.EMAIL) {
-        
-      const user = await firebaseAuth.getOrCreateEmailUser(
-        payload.email,
-        payload.password
-      );
-
-
-      decoded = {
-        uid: user.uid,
-        email: user.email,
-        firebase: { sign_in_provider: "password" }
-      };
-      
+      if (!decoded) {
+        return res.status(401).json({ error: "Invalid Firebase token" });
+      }
     } 
     else {
       return res.status(400).json({ error: "Invalid login type" });
@@ -85,6 +76,13 @@ exports.auth = async (req, res) => {
 exports.signUp = async (req, res) => {
   const { username, email, password } = req.body;
   try {
+    //check email or username already exists in firebase
+    const existingUser = await admin.auth().getUserByEmail(email).catch(() => null);
+     
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already in use" });
+    }
+    
     const firebaseUser = await firebaseAuth.signUpUser(username, email, password);
     const user = await User.createUser({
       uid: firebaseUser.uid,
